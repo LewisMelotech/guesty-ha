@@ -1,0 +1,49 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Guesty",
+        "description": "Enter the client ID and client secret from your Guesty Open API application.",
+        "data": {
+          "client_id": "Client ID",
+          "client_secret": "Client Secret",
+          "webhook_base_url": "Webhook base URL (optional)",
+          "update_interval_minutes": "Polling interval (minutes)"
+        },
+        "data_description": {
+          "webhook_base_url": "Only needed if Home Assistant is behind a reverse proxy - the externally reachable base URL used when registering the reservation webhook with Guesty. Leave blank to use Home Assistant's own detected external URL.",
+          "update_interval_minutes": "How often to poll Guesty for reservation and task updates. Defaults to 15 minutes."
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid client ID or client secret.",
+      "cannot_connect": "Failed to connect to Guesty.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This Guesty account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Guesty settings",
+        "description": "Adjust the webhook base URL and how often Guesty is polled for updates.",
+        "data": {
+          "webhook_base_url": "Webhook base URL",
+          "update_interval_minutes": "Polling interval (minutes)"
+        },
+        "data_description": {
+          "webhook_base_url": "Only needed if Home Assistant is behind a reverse proxy - override the externally reachable base URL used when registering the reservation webhook with Guesty. Leave blank to use Home Assistant's own detected external URL.",
+          "update_interval_minutes": "How often to poll Guesty for reservation and task updates. Defaults to 15 minutes."
+        }
+      }
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "reservation_new": "New reservation"
+    }
+  }
+}

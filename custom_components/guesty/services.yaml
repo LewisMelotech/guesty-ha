@@ -1,0 +1,58 @@
+set_reservation_custom_field:
+  name: Set reservation custom field
+  description: >-
+    Writes a value to a custom field on a Guesty reservation. Accepts either
+    the field's human name (e.g. "Reservation Access Code") or its raw
+    Guesty field ID.
+  fields:
+    reservation_id:
+      name: Reservation ID
+      description: The Guesty reservationId to update (e.g. from a guesty_reservation_new event).
+      required: true
+      example: "6a4611f64d5eacad15bd06e0"
+      selector:
+        text:
+    field:
+      name: Field
+      description: The custom field's name (as configured in Guesty) or its fieldId.
+      required: true
+      example: "Reservation Access Code"
+      selector:
+        text:
+    value:
+      name: Value
+      description: The value to write into the field.
+      required: true
+      example: "384712"
+      selector:
+        text:
+
+get_reservation:
+  name: Get reservation
+  description: >-
+    Fetches a reservation's current, authoritative details from Guesty on
+    demand - useful for refreshing data again later (e.g. closer to
+    check-in) rather than only acting on what an original webhook event
+    contained.
+  fields:
+    reservation_id:
+      name: Reservation ID
+      description: The Guesty reservationId to fetch.
+      required: true
+      example: "6a4611f64d5eacad15bd06e0"
+      selector:
+        text:
+
+get_future_reservations:
+  name: Get future reservations
+  description: >-
+    Lists all future confirmed reservations for one property - e.g. to
+    bulk-reprocess bookings after a property's lock setup changes.
+  fields:
+    listing_id:
+      name: Property
+      description: The Guesty listingId to list future confirmed reservations for.
+      required: true
+      example: "69aeb4d08aed24001314bf86"
+      selector:
+        text:

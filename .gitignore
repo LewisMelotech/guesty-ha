@@ -1,0 +1,17 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# Claude Code session/local settings
+.claude/
+
+# Pre-v1-migration backup, kept locally for reference only ([ and ] are
+# gitignore glob metacharacters, so they're escaped here)
+guesty \[v3\]/
+
+# Editors
+.vscode/
+.idea/

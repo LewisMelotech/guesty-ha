@@ -1,5 +1,7 @@
 # Guesty for Home Assistant
 
+<p align="center"><img src="assets/logo.svg" alt="Guesty for Home Assistant logo" width="160"></p>
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![GitHub release](https://img.shields.io/github/v/release/LewisMelotech/guesty-ha)](https://github.com/LewisMelotech/guesty-ha/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

@@ -1,0 +1,7 @@
+<svg width="512" height="512" viewBox="0 0 512 512" role="img" xmlns="http://www.w3.org/2000/svg">
+<title>Guesty for Home Assistant logo</title>
+<desc>A thick green roof-chevron flowing into two legs, with the words Guesty and HA stacked inside</desc>
+<polygon points="256,60 452,235 452,452 362,452 362,280 256,195 150,280 150,452 60,452 60,235" fill="#1E6F52"/>
+<text x="256" y="345" text-anchor="middle" font-family="'Nunito Sans', 'Nunito', sans-serif" font-weight="700" font-size="50" fill="#1E6F52">Guesty</text>
+<text x="256" y="415" text-anchor="middle" font-family="'Nunito Sans', 'Nunito', sans-serif" font-weight="700" font-size="50" fill="#1E6F52">HA</text>
+</svg>

@@ -30,6 +30,30 @@ from .coordinator import GuestyDataUpdateCoordinator, GuestyTasksCoordinator
 from .custom_fields import field_label, field_slug
 
 
+def _listing_picture_url(listing: dict[str, Any]) -> str | None:
+    """Best-effort extraction of a listing's cover photo URL.
+
+    Guesty's exact payload shape for pictures isn't guaranteed stable (see
+    the general note about not trusting documented shapes at face value),
+    so this tries the couple of shapes seen in practice rather than
+    assuming one - a singular "picture" object, or the first entry of a
+    "pictures" array. Returns None (falling back to the sensor's icon)
+    if neither is present.
+    """
+    picture = listing.get("picture")
+    if isinstance(picture, dict):
+        url = picture.get("thumbnail") or picture.get("regular") or picture.get("original")
+        if url:
+            return url
+
+    pictures = listing.get("pictures")
+    if isinstance(pictures, list) and pictures and isinstance(pictures[0], dict):
+        first = pictures[0]
+        return first.get("thumbnail") or first.get("regular") or first.get("original")
+
+    return None
+
+
 def _guest_name(reservation: dict[str, Any]) -> Any:
     guest = reservation.get("guest") or {}
     return guest.get("fullName") or reservation.get("guestId")
@@ -277,6 +301,7 @@ class GuestyCleaningStatusSensor(
     _attr_name = "Cleaning status"
     _attr_icon = "mdi:broom"
     _attr_device_class = SensorDeviceClass.ENUM
+    _attr_translation_key = "cleaning_status"
     # Confirmed values from a live account; if Guesty ever returns something
     # else, HA will log it as an unrecognized enum value rather than error.
     _attr_options = ["clean", "waitingForInspection", "dirty", "unknown"]
@@ -291,6 +316,11 @@ class GuestyCleaningStatusSensor(
         self._listing_id = listing_id
         self._attr_unique_id = f"{listing_id}_cleaning_status"
         self._init_device(listing_id, listing)
+        # Shows the property's actual cover photo in place of the icon,
+        # when Guesty's listing payload includes one.
+        picture_url = _listing_picture_url(listing)
+        if picture_url:
+            self._attr_entity_picture = picture_url
 
     @property
     def _cleaning_status(self) -> dict[str, Any]:
@@ -326,6 +356,7 @@ class GuestyTurnaroundSensor(
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
 
     def __init__(
         self,
@@ -610,6 +641,7 @@ class GuestyListingCustomFieldSensor(_GuestyDeviceEntity, SensorEntity):
 
     _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_icon = "mdi:tag-outline"
 
     def __init__(
         self,

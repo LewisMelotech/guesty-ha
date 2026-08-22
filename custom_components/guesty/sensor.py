@@ -72,6 +72,7 @@ RESERVATION_SENSOR_DESCRIPTIONS: tuple[GuestyReservationSensorDescription, ...] 
         key="check_in",
         name="Check-in",
         device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-arrow-right",
         value_fn=lambda r: dt_util.parse_datetime(r["checkIn"]),
         attributes_fn=_check_in_attributes,
     ),
@@ -79,28 +80,33 @@ RESERVATION_SENSOR_DESCRIPTIONS: tuple[GuestyReservationSensorDescription, ...] 
         key="check_out",
         name="Check-out",
         device_class=SensorDeviceClass.TIMESTAMP,
+        icon="mdi:calendar-arrow-left",
         value_fn=lambda r: dt_util.parse_datetime(r["checkOut"]),
     ),
     GuestyReservationSensorDescription(
         key="guest_name",
         name="Guest name",
+        icon="mdi:account",
         value_fn=_guest_name,
     ),
     GuestyReservationSensorDescription(
         key="number_of_guests",
         name="Number of guests",
         state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:account-group",
         value_fn=lambda r: r.get("guestsCount"),
     ),
     GuestyReservationSensorDescription(
         key="nights",
         name="Nights",
         state_class=SensorStateClass.MEASUREMENT,
+        icon="mdi:weather-night",
         value_fn=_nights,
     ),
     GuestyReservationSensorDescription(
         key="returning_guest",
         name="Returning guest",
+        icon="mdi:account-heart",
         value_fn=_returning_guest,
     ),
 )
@@ -269,6 +275,7 @@ class GuestyCleaningStatusSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Cleaning status"
+    _attr_icon = "mdi:broom"
     _attr_device_class = SensorDeviceClass.ENUM
     # Confirmed values from a live account; if Guesty ever returns something
     # else, HA will log it as an unrecognized enum value rather than error.
@@ -315,6 +322,7 @@ class GuestyTurnaroundSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Turnaround"
+    _attr_icon = "mdi:autorenew"
     _attr_device_class = SensorDeviceClass.DURATION
     _attr_native_unit_of_measurement = UnitOfTime.HOURS
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -377,6 +385,7 @@ class GuestyLastCheckOutSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Last check-out"
+    _attr_icon = "mdi:calendar-check"
     _attr_device_class = SensorDeviceClass.TIMESTAMP
 
     def __init__(
@@ -411,6 +420,7 @@ class GuestyCheckInsTodaySensor(
 
     _attr_has_entity_name = True
     _attr_name = "Check-ins today"
+    _attr_icon = "mdi:calendar-arrow-right"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: GuestyDataUpdateCoordinator, entry_id: str) -> None:
@@ -433,6 +443,7 @@ class GuestyCheckOutsTodaySensor(
 
     _attr_has_entity_name = True
     _attr_name = "Check-outs today"
+    _attr_icon = "mdi:calendar-arrow-left"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: GuestyDataUpdateCoordinator, entry_id: str) -> None:
@@ -455,6 +466,7 @@ class GuestySameDayTurnaroundsSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Same-day turnarounds"
+    _attr_icon = "mdi:swap-horizontal-bold"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: GuestyDataUpdateCoordinator, entry_id: str) -> None:
@@ -474,6 +486,7 @@ class GuestyTotalOpenTasksSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Total open tasks"
+    _attr_icon = "mdi:clipboard-list"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: GuestyTasksCoordinator, entry_id: str) -> None:
@@ -493,6 +506,7 @@ class GuestyTotalTasksDueTodaySensor(
 
     _attr_has_entity_name = True
     _attr_name = "Tasks due today"
+    _attr_icon = "mdi:clipboard-alert"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: GuestyTasksCoordinator, entry_id: str) -> None:
@@ -517,6 +531,7 @@ class GuestyOpenTasksSensor(
 
     _attr_has_entity_name = True
     _attr_name = "Open tasks"
+    _attr_icon = "mdi:clipboard-list"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
@@ -565,6 +580,7 @@ class GuestyTasksDueTodaySensor(
 
     _attr_has_entity_name = True
     _attr_name = "Tasks due today"
+    _attr_icon = "mdi:clipboard-alert"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(

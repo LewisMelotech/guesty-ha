@@ -8,6 +8,8 @@ Integration" device, since the underlying event is genuinely account-wide.
 """
 from __future__ import annotations
 
+import logging
+
 import voluptuous as vol
 
 from homeassistant.components.device_automation import DEVICE_TRIGGER_BASE_SCHEMA
@@ -24,6 +26,9 @@ from .const import (
     INTEGRATION_DEVICE_ID_PREFIX,
     RESERVATION_DEVICE_ID_SUFFIX,
 )
+
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.warning("guesty.device_trigger module imported")
 
 TRIGGER_TYPE_RESERVATION_NEW = "reservation_new"
 TRIGGER_TYPES = {TRIGGER_TYPE_RESERVATION_NEW}
@@ -59,7 +64,16 @@ async def async_get_triggers(hass: HomeAssistant, device_id: str) -> list[dict]:
     """List the device triggers available for a Guesty device."""
     device_registry = dr.async_get(hass)
     device = device_registry.async_get(device_id)
-    if device is None or not _target_for_device(device)[0]:
+    is_guesty_device = device is not None and _target_for_device(device)[0]
+    _LOGGER.warning(
+        "guesty.device_trigger.async_get_triggers called for device_id=%s "
+        "found_device=%s identifiers=%s is_guesty_device=%s",
+        device_id,
+        device is not None,
+        device.identifiers if device else None,
+        is_guesty_device,
+    )
+    if not is_guesty_device:
         return []
 
     return [

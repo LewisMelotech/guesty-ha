@@ -106,7 +106,7 @@ RESERVATION_SENSOR_DESCRIPTIONS: tuple[GuestyReservationSensorDescription, ...] 
     GuestyReservationSensorDescription(
         key="returning_guest",
         name="Returning guest",
-        icon="mdi:account-heart",
+        icon="mdi:star",
         value_fn=_returning_guest,
     ),
 )

@@ -287,6 +287,17 @@ class GuestyReservationCustomFieldSensor(
         return (reservation.get("custom_field_values") or {}).get(self._field_id)
 
 
+# Guesty's raw cleaningStatus value is camelCase - HA's translation key
+# schema requires lowercase snake_case ([a-z0-9-_]+), so the value is
+# normalized before being returned as the entity's state.
+_CLEANING_STATUS_VALUE_MAP = {
+    "clean": "clean",
+    "waitingForInspection": "waiting_for_inspection",
+    "dirty": "dirty",
+    "unknown": "unknown",
+}
+
+
 class GuestyCleaningStatusSensor(
     _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
@@ -304,7 +315,7 @@ class GuestyCleaningStatusSensor(
     _attr_translation_key = "cleaning_status"
     # Confirmed values from a live account; if Guesty ever returns something
     # else, HA will log it as an unrecognized enum value rather than error.
-    _attr_options = ["clean", "waitingForInspection", "dirty", "unknown"]
+    _attr_options = ["clean", "waiting_for_inspection", "dirty", "unknown"]
 
     def __init__(
         self,
@@ -330,7 +341,10 @@ class GuestyCleaningStatusSensor(
 
     @property
     def native_value(self) -> Any:
-        return self._cleaning_status.get("value")
+        raw = self._cleaning_status.get("value")
+        if raw is None:
+            return None
+        return _CLEANING_STATUS_VALUE_MAP.get(raw, raw)
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:

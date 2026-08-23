@@ -51,7 +51,7 @@
       "cleaning_status": {
         "state": {
           "clean": "Clean",
-          "waitingForInspection": "Waiting for inspection",
+          "waiting_for_inspection": "Waiting for inspection",
           "dirty": "Dirty",
           "unknown": "Unknown"
         }

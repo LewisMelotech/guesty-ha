@@ -51,14 +51,17 @@ The integration automatically creates (and keeps up to date) a Guesty-side webho
 ## Entities
 
 **Property device** (e.g. "Daisy")
+- ID (the property's Guesty listing ID)
 - Cleaning status
 - Turnaround
 - Last check-out
 - Open tasks / Tasks due today (count sensors)
 - Todo list (that property's task backlog)
 - Listing-level custom fields
+- Photo (the listing's cover photo, if Guesty's payload includes one)
 
 **"`<Property>`: Reservation Info" device**
+- ID (the current/next reservation's Guesty reservation ID)
 - Check-in / Check-out
 - Guest name, Number of guests, Nights, Returning guest
 - Reservation-level custom fields

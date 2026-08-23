@@ -12,46 +12,16 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfTime
+from homeassistant.const import EntityCategory, UnitOfTime
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
-from .const import (
-    DOMAIN,
-    INTEGRATION_DEVICE_ID_PREFIX,
-    INTEGRATION_DEVICE_NAME,
-    RESERVATION_DEVICE_ID_SUFFIX,
-    RESERVATION_DEVICE_NAME_SUFFIX,
-)
+from .const import DOMAIN
 from .coordinator import GuestyDataUpdateCoordinator, GuestyTasksCoordinator
 from .custom_fields import field_label, field_slug
-
-
-def _listing_picture_url(listing: dict[str, Any]) -> str | None:
-    """Best-effort extraction of a listing's cover photo URL.
-
-    Guesty's exact payload shape for pictures isn't guaranteed stable (see
-    the general note about not trusting documented shapes at face value),
-    so this tries the couple of shapes seen in practice rather than
-    assuming one - a singular "picture" object, or the first entry of a
-    "pictures" array. Returns None (falling back to the sensor's icon)
-    if neither is present.
-    """
-    picture = listing.get("picture")
-    if isinstance(picture, dict):
-        url = picture.get("thumbnail") or picture.get("regular") or picture.get("original")
-        if url:
-            return url
-
-    pictures = listing.get("pictures")
-    if isinstance(pictures, list) and pictures and isinstance(pictures[0], dict):
-        first = pictures[0]
-        return first.get("thumbnail") or first.get("regular") or first.get("original")
-
-    return None
+from .entity import GuestyDeviceEntity
 
 
 def _guest_name(reservation: dict[str, Any]) -> Any:
@@ -92,6 +62,13 @@ class GuestyReservationSensorDescription(SensorEntityDescription):
 
 
 RESERVATION_SENSOR_DESCRIPTIONS: tuple[GuestyReservationSensorDescription, ...] = (
+    GuestyReservationSensorDescription(
+        key="reservation_id",
+        name="ID",
+        icon="mdi:identifier",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda r: r.get("_id") or r.get("reservationId"),
+    ),
     GuestyReservationSensorDescription(
         key="check_in",
         name="Check-in",
@@ -157,6 +134,7 @@ async def async_setup_entry(
         GuestyTotalTasksDueTodaySensor(tasks_coordinator, entry.entry_id),
     ]
     for listing_id, listing in listings.items():
+        entities.append(GuestyListingIdSensor(listing_id, listing))
         entities.append(GuestyCleaningStatusSensor(coordinator, listing_id, listing))
         entities.append(GuestyTurnaroundSensor(coordinator, listing_id, listing))
         entities.append(GuestyLastCheckOutSensor(coordinator, listing_id, listing))
@@ -176,42 +154,8 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class _GuestyDeviceEntity:
-    """Mixin providing DeviceInfo for the property device or its
-
-    "Reservation Info" child device.
-    """
-
-    def _init_device(self, listing_id: str, listing: dict[str, Any]) -> None:
-        """Attach to the property device itself (e.g. "Daisy")."""
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, listing_id)},
-            name=listing.get("nickname") or listing.get("title") or listing_id,
-            manufacturer="Guesty",
-            model=listing.get("propertyType"),
-        )
-
-    def _init_reservation_device(self, listing_id: str, listing: dict[str, Any]) -> None:
-        """Attach to the "X: Reservation Info" device nested under the property."""
-        property_name = listing.get("nickname") or listing.get("title") or listing_id
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{listing_id}_{RESERVATION_DEVICE_ID_SUFFIX}")},
-            name=f"{property_name}: {RESERVATION_DEVICE_NAME_SUFFIX}",
-            manufacturer="Guesty",
-            via_device=(DOMAIN, listing_id),
-        )
-
-    def _init_integration_device(self, entry_id: str) -> None:
-        """Attach to the bare, per-account "Guesty Integration" device."""
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, f"{INTEGRATION_DEVICE_ID_PREFIX}_{entry_id}")},
-            name=INTEGRATION_DEVICE_NAME,
-            manufacturer="Guesty",
-        )
-
-
 class GuestyReservationSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """A single data point (check-in, guest name, ...) for a property's
 
@@ -254,7 +198,7 @@ class GuestyReservationSensor(
 
 
 class GuestyReservationCustomFieldSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """A reservation-level custom field value (e.g. "Reservation Access
 
@@ -299,7 +243,7 @@ _CLEANING_STATUS_VALUE_MAP = {
 
 
 class GuestyCleaningStatusSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """The property's current housekeeping/cleaning status, polled alongside
 
@@ -327,11 +271,6 @@ class GuestyCleaningStatusSensor(
         self._listing_id = listing_id
         self._attr_unique_id = f"{listing_id}_cleaning_status"
         self._init_device(listing_id, listing)
-        # Shows the property's actual cover photo in place of the icon,
-        # when Guesty's listing payload includes one.
-        picture_url = _listing_picture_url(listing)
-        if picture_url:
-            self._attr_entity_picture = picture_url
 
     @property
     def _cleaning_status(self) -> dict[str, Any]:
@@ -353,7 +292,7 @@ class GuestyCleaningStatusSensor(
 
 
 class GuestyTurnaroundSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """Hours between the relevant reservation's checkout and the next
 
@@ -417,7 +356,7 @@ class GuestyTurnaroundSensor(
 
 
 class GuestyLastCheckOutSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """Checkout time of the property's most recently completed stay.
 
@@ -455,7 +394,7 @@ class GuestyLastCheckOutSensor(
 
 
 class GuestyCheckInsTodaySensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """Number of properties, across the whole account, with a guest
 
@@ -479,7 +418,7 @@ class GuestyCheckInsTodaySensor(
 
 
 class GuestyCheckOutsTodaySensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """Number of properties, across the whole account, with a guest
 
@@ -502,7 +441,7 @@ class GuestyCheckOutsTodaySensor(
 
 
 class GuestySameDayTurnaroundsSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyDataUpdateCoordinator], SensorEntity
 ):
     """Number of properties, across the whole account, checking one guest
 
@@ -525,7 +464,7 @@ class GuestySameDayTurnaroundsSensor(
 
 
 class GuestyTotalOpenTasksSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
 ):
     """Sum of open Guesty tasks across every property."""
 
@@ -545,7 +484,7 @@ class GuestyTotalOpenTasksSensor(
 
 
 class GuestyTotalTasksDueTodaySensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
 ):
     """Sum of open Guesty tasks due today across every property."""
 
@@ -565,7 +504,7 @@ class GuestyTotalTasksDueTodaySensor(
 
 
 class GuestyOpenTasksSensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
 ):
     """Count of open (non-completed) Guesty tasks for this property.
 
@@ -616,7 +555,7 @@ class GuestyOpenTasksSensor(
 
 
 class GuestyTasksDueTodaySensor(
-    _GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
+    GuestyDeviceEntity, CoordinatorEntity[GuestyTasksCoordinator], SensorEntity
 ):
     """Count of open Guesty tasks due (mustFinishBefore) today for this
 
@@ -646,7 +585,26 @@ class GuestyTasksDueTodaySensor(
         )
 
 
-class GuestyListingCustomFieldSensor(_GuestyDeviceEntity, SensorEntity):
+class GuestyListingIdSensor(GuestyDeviceEntity, SensorEntity):
+    """The property's Guesty listing ID, exposed as a plain entity for
+
+    easy reference in automations/templates without needing to inspect
+    another entity's unique_id or wait for a webhook event.
+    """
+
+    _attr_has_entity_name = True
+    _attr_name = "ID"
+    _attr_icon = "mdi:identifier"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_should_poll = False
+
+    def __init__(self, listing_id: str, listing: dict[str, Any]) -> None:
+        self._attr_unique_id = f"{listing_id}_listing_id"
+        self._attr_native_value = listing_id
+        self._init_device(listing_id, listing)
+
+
+class GuestyListingCustomFieldSensor(GuestyDeviceEntity, SensorEntity):
     """A listing-level custom field value (e.g. "Has Smart Lock"),
 
     auto-discovered from the Guesty account. Fetched once at setup rather

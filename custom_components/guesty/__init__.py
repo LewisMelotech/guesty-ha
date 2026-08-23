@@ -48,7 +48,7 @@ from .webhook_utils import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[str] = ["sensor", "todo"]
+PLATFORMS: list[str] = ["sensor", "todo", "image"]
 
 STORAGE_VERSION = 1
 

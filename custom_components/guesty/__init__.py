@@ -608,7 +608,11 @@ def _async_setup_service(hass: HomeAssistant) -> None:
     async def _async_handle_set_custom_field(call: ServiceCall) -> None:
         reservation_id = call.data["reservation_id"]
         field = call.data["field"]
-        value = call.data["value"]
+        # Guesty rejects the write if value is sent as a number rather than
+        # a string (confirmed via testing) - always send a string
+        # regardless of what type the caller passed in, so numeric access
+        # codes etc. don't need to be manually quoted.
+        value = str(call.data["value"])
 
         entry_data = _get_single_entry_data(hass)
         field_id = resolve_field_id(entry_data["reservation_field_defs"], field)

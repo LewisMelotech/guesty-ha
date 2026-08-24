@@ -52,6 +52,32 @@ _LOGGER = logging.getLogger(__name__)
 # problems as a 401 too - treat both as "needs a fresh token".
 TOKEN_EXPIRED_STATUSES = (401, 403)
 
+# Caps how much of a request/response body gets embedded in an error
+# message - Guesty error bodies are normally short, but this is a
+# defensive limit against something unexpectedly large (e.g. an HTML
+# error page from a gateway in front of the API).
+_ERROR_DETAIL_MAX_LENGTH = 1000
+
+
+def _format_sent_payload(kwargs: dict[str, Any]) -> str:
+    """Best-effort rendering of whatever body/params were sent with a
+
+    request, for inclusion in error messages - checks the common kwargs
+    aiohttp requests are made with here (json, data, params), in that
+    order, since a request generally only uses one of them.
+    """
+    for key in ("json", "data", "params"):
+        if key in kwargs:
+            return _truncate(str(kwargs[key]))
+    return "(none)"
+
+
+def _truncate(text: str) -> str:
+    """Cap a string's length for safe inclusion in an error message."""
+    if len(text) <= _ERROR_DETAIL_MAX_LENGTH:
+        return text
+    return text[:_ERROR_DETAIL_MAX_LENGTH] + "...(truncated)"
+
 
 class GuestyApiError(Exception):
     """Generic error talking to the Guesty API."""
@@ -188,10 +214,16 @@ class GuestyApiClient:
             except ClientError as err:
                 raise GuestyApiError(f"Error connecting to Guesty: {err}") from err
 
-        try:
-            response.raise_for_status()
-        except ClientResponseError as err:
-            raise GuestyApiError(f"Guesty API error: {err}") from err
+        if response.status >= 400:
+            # Include both what we sent and Guesty's own response body -
+            # the bare HTTP status alone (e.g. "400, message='Bad Request'")
+            # doesn't say WHY, and Guesty's body usually does.
+            body = await response.text()
+            raise GuestyApiError(
+                f"Guesty API error: {response.status} {response.reason} for "
+                f"{method} {path} - sent: {_format_sent_payload(kwargs)} - "
+                f"response: {_truncate(body)}"
+            )
 
         if response.status == 204:
             return None

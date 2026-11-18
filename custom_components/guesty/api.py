@@ -25,20 +25,13 @@ from .const import (
     OAUTH_SCOPE,
     OAUTH_TOKEN_URL,
     RESERVATIONS_PATH,
+    RESERVATIONS_SEARCH_PATH,
     TASKS_PATH,
     TOKEN_EXPIRY_BUFFER_SECONDS,
     WEBHOOK_SECRET_PATH,
     WEBHOOKS_PATH,
 )
 
-# Fields requested from /reservations - keep list/single-fetch queries
-# consistent so both go through the same reservation-shaping code.
-RESERVATION_FIELDS = (
-    "status confirmationCode guestId listingId checkIn checkOut "
-    "checkInDateLocalized checkOutDateLocalized source channel "
-    "guestsCount numberOfGuests nightsCount keyCode guest.fullName "
-    "listing.nickname listing.title createdAt"
-)
 
 # Columns requested from /tasks-open-api/tasks. createdAt isn't in Guesty's
 # own example query but is needed here to sort by most-recently-created.
@@ -255,44 +248,44 @@ class GuestyApiClient:
         listing_id: str | None = None,
         sort: str = "checkIn",
     ) -> list[dict[str, Any]]:
-        """Search reservations, paginating through all result pages.
+        """Search reservations via /reservations-v3/search, paginating
 
-        `checkout_from` (a full ISO datetime) filters out reservations that
-        checked out before it - used as a loose lower bound (this endpoint's
-        `$gt` operator isn't inclusive, so pass a value safely before the
-        real cutoff; exact current-vs-upcoming filtering happens
-        client-side). `status` restricts to e.g. "confirmed" - without it,
-        Guesty also returns unconfirmed `inquiry` holds that aren't real
-        bookings. `listing_id` restricts to a single property.
+        through all result pages.
+
+        `checkout_from` is a localized `YYYY-MM-DD` date: reservations that
+        checked out before it are excluded (`filter[checkOut][gte]`).
+        Exact current-vs-upcoming filtering happens client-side. `status`
+        restricts to e.g. "confirmed" (comma-separated values mean "any
+        of"); without it, Guesty also returns unconfirmed `inquiry` holds
+        that aren't real bookings. `listing_id` restricts to a single
+        property.
+
+        Results are normalized to the flat shape the rest of the
+        integration expects - see normalize_reservation.
         """
-        filters: list[dict[str, str]] = []
-        if status:
-            filters.append({"field": "status", "operator": "$eq", "value": status})
-        if checkout_from:
-            filters.append(
-                {"field": "checkOut", "operator": "$gt", "value": checkout_from}
-            )
-        if listing_id:
-            filters.append({"field": "listingId", "operator": "$eq", "value": listing_id})
-
         params: dict[str, Any] = {
             "sort": sort,
             "limit": API_PAGE_SIZE,
             "skip": 0,
-            "fields": RESERVATION_FIELDS,
         }
-        if filters:
-            params["filters"] = json.dumps(filters)
+        if status:
+            params["filter[status]"] = status
+        if checkout_from:
+            params["filter[checkOut][gte]"] = checkout_from
+        if listing_id:
+            params["filter[listingId]"] = listing_id
 
         reservations: list[dict[str, Any]] = []
         while True:
-            page = await self.async_request("GET", RESERVATIONS_PATH, params=params)
-            results = page["results"]
-            reservations.extend(results)
-            total = page.get("count", 0)
-            if not results or params["skip"] + len(results) >= total:
+            page = await self.async_request(
+                "GET", RESERVATIONS_SEARCH_PATH, params=params
+            )
+            results = (page or {}).get("results") or []
+            reservations.extend(normalize_reservation(r) for r in results)
+            has_more = ((page or {}).get("pagination") or {}).get("hasMore")
+            if not results or not has_more:
                 break
-            params["skip"] += API_PAGE_SIZE
+            params["skip"] += len(results)
 
         return reservations
 
@@ -338,19 +331,33 @@ class GuestyApiClient:
             "PUT", f"/tasks-open-api/{task_id}", json={"status": "completed"}
         )
 
-    async def async_get_reservation(self, reservation_id: str) -> dict[str, Any]:
+    async def async_get_reservation(self, reservation_id: str) -> dict[str, Any] | None:
         """Fetch one reservation's current, authoritative state by ID.
 
         Used after a webhook delivery instead of trusting the webhook's own
         payload - Guesty can send multiple webhook deliveries per event, and
         recommends re-fetching the latest state rather than relying on
         webhook payload contents.
+
+        Uses GET /reservations-v3?reservationIds[]=..., which returns a bare
+        array (up to 10 IDs per call). Returns None if Guesty doesn't return
+        the reservation.
         """
-        return await self.async_request(
+        payload = await self.async_request(
             "GET",
-            f"{RESERVATIONS_PATH}/{reservation_id}",
-            params={"fields": RESERVATION_FIELDS},
+            RESERVATIONS_PATH,
+            params={"reservationIds[]": reservation_id},
         )
+        if isinstance(payload, dict):
+            payload = payload.get("results") or payload.get("reservations") or [payload]
+        for reservation in payload or []:
+            if not isinstance(reservation, dict):
+                continue
+            normalized = normalize_reservation(reservation)
+            if normalized.get("_id") in (None, reservation_id):
+                normalized["_id"] = reservation_id
+                return normalized
+        return None
 
     async def async_get_reservation_custom_fields(
         self, reservation_id: str
@@ -458,3 +465,54 @@ class GuestyApiClient:
             f"/reservations-v3/{reservation_id}/custom-fields",
             json={"customFields": [{"fieldId": field_id, "value": value}]},
         )
+
+
+def normalize_reservation(reservation: dict[str, Any]) -> dict[str, Any]:
+    """Flatten a Reservations v3 object into the shape the integration uses.
+
+    The v3 search and get-by-ID endpoints don't return identical shapes:
+    search has `reservationId`, top-level `checkIn`/`checkOut` and
+    `guestId`, while get-by-ID has `_id`, `bookerId`, and dates only inside
+    `stay[]`. Both keep the listing and guest count per stay segment
+    (`stay[]`) rather than at the top level. This copies the first stay
+    segment's values up to the top-level keys that sensors, events and
+    services read (`_id`, `listingId`, `checkIn`, `checkOut`, `guestId`,
+    `guestsCount`, `source`), without overwriting anything already set.
+    """
+    result = dict(reservation)
+    stays = reservation.get("stay") or []
+    stay = stays[0] if stays and isinstance(stays[0], dict) else {}
+
+    def _first(*values: Any) -> Any:
+        for value in values:
+            if value not in (None, ""):
+                return value
+        return None
+
+    result["_id"] = _first(reservation.get("_id"), reservation.get("reservationId"))
+    result["listingId"] = _first(
+        reservation.get("listingId"),
+        stay.get("listingId"),
+        stay.get("unitId"),
+        stay.get("unitTypeId"),
+    )
+    result["checkIn"] = _first(
+        reservation.get("checkIn"),
+        stay.get("checkIn"),
+        reservation.get("checkInDateLocalized"),
+        stay.get("checkInDateLocalized"),
+    )
+    result["checkOut"] = _first(
+        reservation.get("checkOut"),
+        stay.get("checkOut"),
+        reservation.get("checkOutDateLocalized"),
+        stay.get("checkOutDateLocalized"),
+    )
+    result["guestId"] = _first(reservation.get("guestId"), reservation.get("bookerId"))
+    result["guestsCount"] = _first(
+        reservation.get("guestsCount"), stay.get("guestsCount")
+    )
+    result["source"] = _first(
+        reservation.get("source"), reservation.get("channel"), reservation.get("platform")
+    )
+    return result

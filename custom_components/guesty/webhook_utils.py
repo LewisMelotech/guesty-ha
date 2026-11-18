@@ -18,9 +18,9 @@ from .custom_fields import field_label
 
 _LOGGER = logging.getLogger(__name__)
 
-# Only reservation.new is handled - reservation.updated is intentionally
-# ignored (see parse_event_type).
-_HANDLED_EVENT_TYPES = {"reservation.new"}
+# Only reservation.created.v2 is handled - reservation.updated.v2 is
+# intentionally ignored (see is_handled_event).
+_HANDLED_EVENT_TYPES = {"reservation.created.v2"}
 
 
 def verify_svix_signature(
@@ -57,13 +57,20 @@ def verify_svix_signature(
 
 
 def is_handled_event(payload: dict[str, Any]) -> bool:
-    """Return True if this webhook payload is a `reservation.new` event.
+    """Return True if this webhook payload is a `reservation.created.v2` event.
 
-    `reservation.updated` and any other event types are intentionally
-    ignored - only new reservations trigger downstream automations.
+    v2 payloads carry the event name at `data.event` (with the reservation
+    ID at `data.reservationId`); top-level keys are still checked
+    defensively. `reservation.updated.v2` and any other event types are
+    intentionally ignored - only new reservations trigger downstream
+    automations.
     """
-    event = payload.get("event") or payload.get("type") or payload.get("eventType")
-    return str(event) in _HANDLED_EVENT_TYPES
+    data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+    for container in (payload, data):
+        for key in ("event", "type", "eventType"):
+            if str(container.get(key)) in _HANDLED_EVENT_TYPES:
+                return True
+    return False
 
 
 def extract_reservation_id(payload: dict[str, Any]) -> str | None:

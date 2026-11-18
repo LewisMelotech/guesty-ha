@@ -339,14 +339,15 @@ class GuestyApiClient:
         recommends re-fetching the latest state rather than relying on
         webhook payload contents.
 
-        Uses GET /reservations-v3?reservationIds[]=..., which returns a bare
+        Uses GET /reservations-v3?reservationIds=[<id>] (the bracketed,
+        unquoted form confirmed against the live API), which returns a bare
         array (up to 10 IDs per call). Returns None if Guesty doesn't return
         the reservation.
         """
         payload = await self.async_request(
             "GET",
             RESERVATIONS_PATH,
-            params={"reservationIds[]": reservation_id},
+            params={"reservationIds": f"[{reservation_id}]"},
         )
         if isinstance(payload, dict):
             payload = payload.get("results") or payload.get("reservations") or [payload]
@@ -364,10 +365,8 @@ class GuestyApiClient:
     ) -> list[dict[str, Any]]:
         """Fetch the populated custom field values for one reservation.
 
-        Uses the v3 custom-fields endpoint deliberately, not v1's - v1 as a
-        whole is being sunset by Guesty, while this specific v3 sub-resource
-        is released/stable (unlike /reservations-v3/search, which is beta
-        and misses some channels' reservations entirely).
+        Uses the v3 custom-fields endpoint (the legacy v1 reservation
+        endpoints are retired on 1 March 2027).
         """
         payload = await self.async_request(
             "GET", f"/reservations-v3/{reservation_id}/custom-fields"
@@ -473,7 +472,9 @@ def normalize_reservation(reservation: dict[str, Any]) -> dict[str, Any]:
     The v3 search and get-by-ID endpoints don't return identical shapes:
     search has `reservationId`, top-level `checkIn`/`checkOut` and
     `guestId`, while get-by-ID has `_id`, `bookerId`, and dates only inside
-    `stay[]`. Both keep the listing and guest count per stay segment
+    `stay[]` (as localized dates plus `eta`/`etd` datetimes, which are
+    used for check-in/check-out when present). Both keep the listing and
+    guest count per stay segment
     (`stay[]`) rather than at the top level. This copies the first stay
     segment's values up to the top-level keys that sensors, events and
     services read (`_id`, `listingId`, `checkIn`, `checkOut`, `guestId`,
@@ -499,12 +500,14 @@ def normalize_reservation(reservation: dict[str, Any]) -> dict[str, Any]:
     result["checkIn"] = _first(
         reservation.get("checkIn"),
         stay.get("checkIn"),
+        stay.get("eta"),
         reservation.get("checkInDateLocalized"),
         stay.get("checkInDateLocalized"),
     )
     result["checkOut"] = _first(
         reservation.get("checkOut"),
         stay.get("checkOut"),
+        stay.get("etd"),
         reservation.get("checkOutDateLocalized"),
         stay.get("checkOutDateLocalized"),
     )

@@ -19,7 +19,7 @@ LISTINGS_PATH = "/listings"
 
 # Reservations v3. Guesty retires the legacy /reservations endpoints (and
 # the reservation.new / reservation.updated webhooks) on 1 March 2027.
-# GET RESERVATIONS_PATH?reservationIds[]=... fetches by ID (bare array, max
+# GET RESERVATIONS_PATH?reservationIds=[<id>] fetches by ID (bare array, max
 # 10 IDs); RESERVATIONS_SEARCH_PATH lists/filters with filter[...] params
 # and returns {"results": [...], "pagination": {"hasMore": ...}}.
 RESERVATIONS_PATH = "/reservations-v3"

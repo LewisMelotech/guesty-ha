@@ -243,7 +243,7 @@ async def _async_attach_listing_custom_field_values(
 async def _async_setup_webhook(
     hass: HomeAssistant, entry: ConfigEntry, client: GuestyApiClient
 ) -> None:
-    """Register a webhook so Guesty can push reservation.new events.
+    """Register a webhook so Guesty can push reservation.created.v2 events.
 
     The webhook ID, Guesty's own webhook subscription ID, and the Svix
     signing secret are all persisted, so this is idempotent across restarts
@@ -325,7 +325,7 @@ async def _async_ensure_guesty_webhook(
 ) -> str | None:
     """Create or update the Guesty-side webhook subscription so it points at
 
-    `webhook_url` for the reservation.new event.
+    `webhook_url` for the reservation.created.v2 event.
 
     Guesty only supports managing webhooks via this API (no dashboard
     equivalent). To avoid ever creating a duplicate subscription: if we
@@ -431,7 +431,7 @@ def _make_webhook_handler(entry_id: str, webhook_store: Store):
 
         if not is_handled_event(payload):
             _LOGGER.debug(
-                "Ignoring Guesty webhook payload that isn't reservation.new; "
+                "Ignoring Guesty webhook payload that isn't reservation.created.v2; "
                 "top-level keys were: %s",
                 sorted(payload.keys()),
             )
@@ -474,8 +474,8 @@ def _make_webhook_handler(entry_id: str, webhook_store: Store):
             )
             return Response(status=200)
 
-        # v1 /reservations doesn't embed custom fields - fetch separately,
-        # same as the coordinator does for its own reservation enrichment.
+        # Fetch custom fields from their dedicated endpoint (labelled values
+        # by fieldId), same as the coordinator does for its own enrichment.
         try:
             reservation["customFields"] = await client.async_get_reservation_custom_fields(
                 reservation_id
@@ -671,9 +671,7 @@ def _async_setup_service(hass: HomeAssistant) -> None:
         entry_data = _get_single_entry_data(hass)
         client: GuestyApiClient = entry_data["client"]
 
-        checkout_from = (dt_util.utcnow() - timedelta(days=1)).strftime(
-            "%Y-%m-%dT00:00:00.000Z"
-        )
+        checkout_from = (dt_util.now() - timedelta(days=1)).strftime("%Y-%m-%d")
         try:
             reservations = await client.async_search_reservations(
                 checkout_from=checkout_from,
@@ -684,12 +682,26 @@ def _async_setup_service(hass: HomeAssistant) -> None:
         except GuestyApiError as err:
             raise HomeAssistantError(f"Failed to fetch Guesty reservations: {err}") from err
 
+        # v3 reservations only carry a guestId, not the guest's name, so
+        # look each distinct guest up once via /guests-crud.
+        guest_names: dict[str, str | None] = {}
+        for r in reservations:
+            guest_id = r.get("guestId")
+            if not guest_id or guest_id in guest_names:
+                continue
+            try:
+                guest = await client.async_get_guest(guest_id)
+            except GuestyApiError as err:
+                _LOGGER.debug("Could not fetch Guesty guest %s: %s", guest_id, err)
+                guest = None
+            guest_names[guest_id] = (guest or {}).get("fullName")
+
         return {
             "reservations": [
                 {
                     "reservation_id": r.get("_id"),
                     "confirmation_code": r.get("confirmationCode"),
-                    "guest_name": (r.get("guest") or {}).get("fullName"),
+                    "guest_name": guest_names.get(r.get("guestId")),
                     "check_in": r.get("checkIn"),
                     "check_out": r.get("checkOut"),
                     "status": r.get("status"),

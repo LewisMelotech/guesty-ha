@@ -62,15 +62,14 @@ class GuestyDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]
 
     async def _async_update_data(self) -> dict[str, dict[str, Any]]:
         """Fetch reservations and listings, and group/enrich per listing."""
-        # A loose lower bound - the /reservations endpoint's $gt isn't
-        # inclusive, so this is deliberately a little early; exact current-
-        # vs-upcoming filtering happens in _pick_relevant against real "now".
-        # Wider than current-stay detection alone would need, so the most
-        # recently completed stay (for "last checkout") stays discoverable
-        # across longer vacancies between bookings too.
+        # A localized-date lower bound on checkout (filter[checkOut][gte]);
+        # exact current-vs-upcoming filtering happens in _pick_relevant
+        # against real "now". Wider than current-stay detection alone would
+        # need, so the most recently completed stay (for "last checkout")
+        # stays discoverable across longer vacancies between bookings too.
         checkout_from = (
-            dt_util.utcnow() - timedelta(days=RESERVATION_LOOKBACK_DAYS)
-        ).strftime("%Y-%m-%dT00:00:00.000Z")
+            dt_util.now() - timedelta(days=RESERVATION_LOOKBACK_DAYS)
+        ).strftime("%Y-%m-%d")
 
         try:
             reservations = await self._client.async_search_reservations(
@@ -263,7 +262,8 @@ class GuestyDataUpdateCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]
 
 
 def extract_listing_id(reservation: dict[str, Any]) -> str | None:
-    """The listing ID sits directly on the reservation via /reservations."""
+    """The listing ID, lifted from the first stay segment by
+    api.normalize_reservation (v3 doesn't put it at the top level)."""
     return reservation.get("listingId")
 
 

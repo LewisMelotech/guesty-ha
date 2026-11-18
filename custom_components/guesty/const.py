@@ -17,20 +17,18 @@ TOKEN_EXPIRY_BUFFER_SECONDS = 120
 
 LISTINGS_PATH = "/listings"
 
-# Guesty's newer /reservations-v3/search is still in beta and silently
-# omits some channels (confirmed: Booking.com reservations never appear,
-# for any filter). The older /reservations endpoint has full channel
-# coverage, so that's what's used for the reservation list/search despite
-# its more limited (filters-array) query syntax. The v3-based
-# implementation is preserved in the `guesty [v3]` folder alongside this
-# component for when v3 matures.
-RESERVATIONS_PATH = "/reservations"
+# Reservations v3. Guesty retires the legacy /reservations endpoints (and
+# the reservation.new / reservation.updated webhooks) on 1 March 2027.
+# GET RESERVATIONS_PATH?reservationIds=[<id>] fetches by ID (bare array, max
+# 10 IDs); RESERVATIONS_SEARCH_PATH lists/filters with filter[...] params
+# and returns {"results": [...], "pagination": {"hasMore": ...}}.
+RESERVATIONS_PATH = "/reservations-v3"
+RESERVATIONS_SEARCH_PATH = "/reservations-v3/search"
 
-# Max page size accepted by /listings and /reservations.
+# Max page size accepted by /listings and /reservations-v3/search.
 API_PAGE_SIZE = 100
 
-# Guesty's v1 /reservations filters only support a single value per $eq
-# comparison (no comma-separated IN like v3's filter[status]=a,b).
+# Sent as filter[status]; v3 accepts a comma-separated list meaning "any of".
 RESERVATION_INCLUDED_STATUS = "confirmed"
 
 # Reservation data gets its own child device (e.g. "Daisy: Reservation Info")
@@ -54,17 +52,19 @@ DEFAULT_UPDATE_INTERVAL_MINUTES = 15
 RESERVATION_LOOKBACK_DAYS = 45
 
 # Fired on Home Assistant's event bus when Guesty's webhook delivers a
-# reservation.new notification. reservation.updated is intentionally not
-# handled. Automations can trigger on this directly
+# reservation.created.v2 notification. reservation.updated.v2 is
+# intentionally not handled. Automations can trigger on this directly
 # (event_type: guesty_reservation_new).
 EVENT_RESERVATION_NEW = f"{DOMAIN}_reservation_new"
 
 WEBHOOK_SECRET_PATH = "/webhooks-v2/secret"
 WEBHOOKS_PATH = "/webhooks"
 
-# Only reservation.new is subscribed to on Guesty's side; see
-# webhook_utils.is_handled_event for the receiving-end counterpart.
-WEBHOOK_EVENTS = ["reservation.new"]
+# Only reservation.created.v2 (the replacement for the legacy
+# reservation.new) is subscribed to on Guesty's side. The subscription is
+# PUT on every setup, so existing installs switch over on their next
+# reload. See webhook_utils.is_handled_event for the receiving end.
+WEBHOOK_EVENTS = ["reservation.created.v2"]
 
 # Optional per-entry override (set via the Options Flow) for the externally
 # reachable base URL to use when registering the webhook with Guesty - needed

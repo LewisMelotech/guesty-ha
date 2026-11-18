@@ -14,7 +14,7 @@ A Home Assistant custom integration for [Guesty](https://www.guesty.com/), a pro
 - Check-in, check-out, guest name, guest count, nights, and returning-guest status for the current or next reservation
 - Cleaning status, turnaround time (gap between checkout and the next check-in), and last checkout time
 - Custom fields - both listing- and reservation-level - are auto-discovered from your Guesty account, not hardcoded
-- Live updates via a Guesty webhook (`reservation.new`), auto-registered and kept in sync by the integration - no manual webhook setup in Guesty's dashboard
+- Live updates via a Guesty webhook (`reservation.created.v2`), auto-registered and kept in sync by the integration - no manual webhook setup in Guesty's dashboard
 - Guesty Tasks support: a per-property `todo` list, plus "Open tasks" and "Tasks due today" count sensors, with two-way sync for marking tasks complete
 - An account-wide "Guesty Integration" device with portfolio-level sensors: check-ins today, check-outs today, same-day turnarounds, and task totals across every property
 - A `guesty_reservation_new` event, plus native Home Assistant **device triggers** ("New reservation") selectable directly in the Automation UI - either scoped to one property or account-wide
@@ -46,7 +46,7 @@ Go to **Settings → Devices & services → Add Integration → Guesty** and ent
 - **Webhook base URL** *(optional)* - only needed if Home Assistant sits behind a reverse proxy it doesn't already know its own external URL through
 - **Polling interval** *(optional, default 15 minutes)* - how often reservations and tasks are re-fetched; both editable later via the integration's **Configure** option
 
-The integration automatically creates (and keeps up to date) a Guesty-side webhook subscription so `reservation.new` events reach Home Assistant instantly, without waiting for the next poll.
+The integration automatically creates (and keeps up to date) a Guesty-side webhook subscription so `reservation.created.v2` events reach Home Assistant instantly, without waiting for the next poll.
 
 ## Entities
 
